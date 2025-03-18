@@ -10,32 +10,12 @@ import json
 cap = cv2.VideoCapture(0)
 
 mpHands = mp.solutions.hands
-hands = mpHands.Hands(max_num_hands=1)
+hands = mpHands.Hands(max_num_hands=2)
 mpDraw = mp.solutions.drawing_utils
 
-custom_objects = {
-    'Orthogonal': tf.keras.initializers.Orthogonal
-}
-
-with h5py.File("lstm-hand-gripping.h5", 'r') as f:
-    model_config = f.attrs.get('model_config')
-    model_config = json.loads(model_config)  
-
-    for layer in model_config['config']['layers']:
-        if 'time_major' in layer['config']:
-            del layer['config']['time_major']
-
-    model_json = json.dumps(model_config)
-
-    model = tf.keras.models.model_from_json(model_json, custom_objects=custom_objects)
-
-    weights_group = f['model_weights']
-    for layer in model.layers:
-        layer_name = layer.name
-        if layer_name in weights_group:
-            weight_names = weights_group[layer_name].attrs['weight_names']
-            layer_weights = [weights_group[layer_name][weight_name] for weight_name in weight_names]
-            layer.set_weights(layer_weights)
+# Load the model directly
+model = tf.keras.models.load_model("lstm-hand-punch.h5")
+print(model.summary())
 
 lm_list = []
 label = "not grasped"
@@ -49,6 +29,9 @@ def make_landmark_timestep(results):
                 c_lm.append(lm.x)
                 c_lm.append(lm.y)
                 c_lm.append(lm.z)
+    else:
+        # If no hands are detected, append zeros or a neutral value
+        c_lm = [0.0] * 126  # Adjust this based on your model's input size
     return c_lm
 
 def draw_landmark_on_image(mpDraw, results, frame):
@@ -79,26 +62,19 @@ def draw_bounding_box_and_label(frame, results, label):
 def detect(model, lm_list):
     global label
     lm_list = np.array(lm_list)
+    print(f"Input shape before expansion: {lm_list.shape}")  # Debug statement
+    if lm_list.shape != (20, 126):  # Adjust this shape based on your model's input
+        print(f"Invalid input shape: {lm_list.shape}")
+        return neutral_label
     lm_list = np.expand_dims(lm_list, axis=0)
     result = model.predict(lm_list)
     percentage_result = result * 100
     print(f"Model prediction result: {percentage_result}")
     if result[0][0] > 0.5:
-        label = "not grasped"
+        label = "left_punch"
     elif result[0][1] > 0.5:
-        label = "grasping"
-    elif result[0][2] > 0.5:
-        label = "carrying"
-    elif result[0][3] > 0.5:
-        label = "cupping"
-    if label in ["grasping", "carrying", "cupping"]:
-        label = "grasped"
+        label = "right_punch"
     return str(label)
-
-
-cv2.namedWindow("image", cv2.WINDOW_NORMAL)
-
-cv2.resizeWindow("image", 1200, 1000)  
 
 i = 0
 warm_up_frames = 60

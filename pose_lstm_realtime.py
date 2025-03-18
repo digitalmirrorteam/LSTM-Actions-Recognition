@@ -7,35 +7,14 @@ import threading
 import h5py
 import json
 
-cap = cv2.VideoCapture(6)
+cap = cv2.VideoCapture(0)
 
 mpPose = mp.solutions.pose
 pose = mpPose.Pose()
 mpDraw = mp.solutions.drawing_utils
 
-custom_objects = {
-    'Orthogonal': tf.keras.initializers.Orthogonal
-}
-
-with h5py.File("lstm-model.h5", 'r') as f:
-    model_config = f.attrs.get('model_config')
-    model_config = json.loads(model_config)  
-
-    for layer in model_config['config']['layers']:
-        if 'time_major' in layer['config']:
-            del layer['config']['time_major']
-
-    model_json = json.dumps(model_config)
-
-    model = tf.keras.models.model_from_json(model_json, custom_objects=custom_objects)
-
-    weights_group = f['model_weights']
-    for layer in model.layers:
-        layer_name = layer.name
-        if layer_name in weights_group:
-            weight_names = weights_group[layer_name].attrs['weight_names']
-            layer_weights = [weights_group[layer_name][weight_name] for weight_name in weight_names]
-            layer.set_weights(layer_weights)
+# Load the model directly from the HDF5 file
+model = tf.keras.models.load_model("lstm-violencia.h5")
 
 lm_list = []
 label = "neutral"
@@ -79,10 +58,14 @@ def detect(model, lm_list):
     lm_list = np.array(lm_list)
     lm_list = np.expand_dims(lm_list, axis=0)
     result = model.predict(lm_list)
+    percentage_result = result * 100
+    print(f"Model prediction result: {percentage_result}")
     if result[0][0] > 0.5:
-        label = "violent" 
-    else:
         label = "neutral"
+    elif result[0][1] > 0.5:
+        label = "left_punch"
+    elif result[0][2] > 0.5:
+        label = "right_punch"
     return str(label)
 
 i = 0

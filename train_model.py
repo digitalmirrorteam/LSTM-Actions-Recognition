@@ -5,10 +5,9 @@ from keras.layers import LSTM, Dense, Dropout
 from keras.models import Sequential
 from sklearn.model_selection import train_test_split
 
-leftpunch_df = pd.read_csv("left_punch.txt")
-rightpunch_df = pd.read_csv("right_punch.txt")
-neutral_df = pd.read_csv("neutral.txt")
-
+neutral_df = pd.read_csv("h_neutral.txt")
+leftpunch_df = pd.read_csv("h_left_punch.txt")
+rightpunch_df = pd.read_csv("h_right_punch.txt")
 
 X = []
 y = []
@@ -30,7 +29,7 @@ datasets = rightpunch_df.iloc[:, 1:].values
 n_samples = len(datasets)
 for i in range(no_of_timesteps, n_samples):
     X.append(datasets[i-no_of_timesteps:i, :])
-    y.append(2)  
+    y.append(2)
 
 X, y = np.array(X), np.array(y)
 print(X.shape, y.shape)
@@ -52,4 +51,4 @@ model.compile(optimizer="adam", metrics=["accuracy"], loss="sparse_categorical_c
 
 model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test))
 
-model.save("lstm-violencia.h5")
+model.save("lstm-hand-punch.h5")
